@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Self_Center 模块配置",
+  "description": "宿主 APP 注入的配置结构，用于个人页与设置展示及能力开关",
+  "type": "object",
+  "properties": {
+    "user": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nickname": { "type": "string" },
+        "avatar": { "type": "string", "format": "uri" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "account": { "type": "string" }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "properties": {
+        "primary": { "type": "string" },
+        "background": { "type": "string" },
+        "dark": { "type": "boolean" }
+      }
+    },
+    "apiBase": { "type": "string" },
+    "strings": {
+      "type": "object",
+      "description": "界面文案覆盖"
+    },
+    "features": {
+      "type": "object",
+      "properties": {
+        "showMessageCenter": { "type": "boolean" },
+        "showDeviceManage": { "type": "boolean" },
+        "showFirmware": { "type": "boolean" },
+        "showLogout": { "type": "boolean" }
+      }
+    }
+  }
+}

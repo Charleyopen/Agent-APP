@@ -1,0 +1,104 @@
+# Vibecoding 全栈在 AWS 一键运行：用户注册接口 + AgentChat
+# 在项目根目录执行：docker compose -f docker-compose.aws.yml up -d
+# 国内构建加速：PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple docker compose -f docker-compose.aws.yml build
+
+services:
+  # ---------- 用户注册系统（User_Registeration）----------
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - vibecoding-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: miniapi
+      TZ: UTC
+    command: ["postgres", "-c", "max_connections=300"]
+    ports:
+      - "5432:5432"
+    volumes:
+      - vibecoding-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  user-reg-app:
+    build:
+      context: ./User_Registeration
+      dockerfile: Dockerfile
+      args:
+        - PIP_INDEX_URL=${PIP_INDEX_URL:-}
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/miniapi
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      RATE_LIMIT_AUTH_PER_MIN: ${RATE_LIMIT_AUTH_PER_MIN:-10}
+      DATA_DIR: /app/data
+      TZ: UTC
+      WORKERS: "4"
+      POOL_MIN_SIZE: "10"
+      POOL_MAX_SIZE: "50"
+    volumes:
+      - vibecoding-log:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ---------- AgentChat ----------
+  # 若在 Linux 上用宿主机 Ollama，可取消下面 extra_hosts 注释，并设置 OPENAI_BASE_URL=http://host.docker.internal:11434/v1
+  agentchat:
+    # extra_hosts: - "host.docker.internal:host-gateway"
+    build:
+      context: ./AgentChat
+      dockerfile: Dockerfile
+      args:
+        - PIP_INDEX_URL=${PIP_INDEX_URL:-}
+    ports:
+      - "8765:8765"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      MEM0_ENABLED: ${MEM0_ENABLED:-true}
+      RAG_ENABLED: ${RAG_ENABLED:-false}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      RATE_LIMIT_CHAT_PER_MIN: ${RATE_LIMIT_CHAT_PER_MIN:-20}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+      HOST: "0.0.0.0"
+      PORT: "8765"
+      TZ: UTC
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  vibecoding-pgdata:
+  vibecoding-redis:
+  vibecoding-log:

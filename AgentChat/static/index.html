@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgentChat</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <h1 class="title">AgentChat</h1>
+      <p class="subtitle">LLM · Mem0 记忆 · RAG · Skills</p>
+    </header>
+    <main class="main">
+      <div class="chat" id="chat" role="log" aria-live="polite"></div>
+      <form class="form" id="form">
+        <textarea
+          id="input"
+          class="input"
+          placeholder="输入消息，按 Enter 发送..."
+          rows="1"
+          maxlength="4096"
+        ></textarea>
+        <button type="submit" class="send" id="send" aria-label="发送">发送</button>
+      </form>
+    </main>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

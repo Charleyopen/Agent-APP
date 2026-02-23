@@ -1,0 +1,25 @@
+# 不提交子模块的 .git（整个项目作为一个仓库推送）
+User_Registeration/.git/
+
+# 环境变量与密钥
+.env
+.env.local
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# 日志与本地数据
+*.log
+mini.log
+miniapi-pgdata/
+
+# 系统与 IDE
+.DS_Store
+.idea/
+*.swp
+*.swo

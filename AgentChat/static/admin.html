@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgentChat 后台看板</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a1f26;
+      --border: #2d3748;
+      --text: #e2e8f0;
+      --muted: #718096;
+      --ok: #48bb78;
+      --warn: #ecc94b;
+      --err: #fc8181;
+      --accent: #63b3ed;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .layout {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    h1 { margin: 0; font-size: 1.25rem; font-weight: 600; }
+    .sub { color: var(--muted); font-size: 0.85rem; margin-top: 0.25rem; }
+    .refresh {
+      padding: 0.5rem 1rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .refresh:hover { background: var(--border); }
+    .refresh:disabled { opacity: 0.6; cursor: not-allowed; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+    }
+    .card h2 {
+      margin: 0 0 0.75rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .card .row { display: flex; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.4rem; }
+    .card .row:last-child { margin-bottom: 0; }
+    .card .label { color: var(--muted); }
+    .card .value { font-weight: 500; }
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+    .badge.ok { background: rgba(72,187,120,0.2); color: var(--ok); }
+    .badge.warn { background: rgba(236,201,75,0.2); color: var(--warn); }
+    .badge.err { background: rgba(252,129,129,0.2); color: var(--err); }
+    .badge.muted { background: rgba(113,128,150,0.2); color: var(--muted); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 500; }
+    tr:last-child td { border-bottom: none; }
+    .loading { color: var(--muted); }
+    .error-msg { color: var(--err); margin-top: 0.5rem; }
+    .meta { color: var(--muted); font-size: 0.8rem; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <header>
+      <div>
+        <h1>AgentChat 后台看板</h1>
+        <p class="sub">服务状态 · LLM · Mem0 · RAG · Skills · 统计</p>
+      </div>
+      <button type="button" class="refresh" id="refresh">刷新</button>
+    </header>
+    <div id="content" class="loading">加载中…</div>
+    <p class="meta" id="meta"></p>
+  </div>
+  <script>
+    (function () {
+      const content = document.getElementById("content");
+      const meta = document.getElementById("meta");
+      const refreshBtn = document.getElementById("refresh");
+
+      function badgeClass(v) {
+        if (v === true || v === "ok" || v === "yes") return "ok";
+        if (v === false || v === "error") return "err";
+        return "muted";
+      }
+
+      function render(data) {
+        const s = data.service || {};
+        const llm = data.llm || {};
+        const mem = data.memory || {};
+        const rag = data.rag || {};
+        const skills = data.skills || [];
+        const stats = data.stats || {};
+
+        const uptime = s.uptime_seconds != null ? formatUptime(s.uptime_seconds) : "—";
+        const lastActivity = stats.last_activity_iso ? new Date(stats.last_activity_iso).toLocaleString("zh-CN") : "暂无";
+
+        content.innerHTML = [
+          '<div class="grid">',
+          '<div class="card"><h2>服务</h2>',
+          '<div class="row"><span class="label">状态</span><span class="badge ok">运行中</span></div>',
+          '<div class="row"><span class="label">运行时长</span><span class="value">' + uptime + '</span></div>',
+          '</div>',
+          '<div class="card"><h2>LLM</h2>',
+          '<div class="row"><span class="label">已配置</span><span class="badge ' + badgeClass(llm.configured) + '">' + (llm.configured ? "是" : "否") + '</span></div>',
+          '<div class="row"><span class="label">Base URL</span><span class="value" title="' + (llm.base_url || "") + '">' + (llm.base_url || "—") + '</span></div>',
+          '<div class="row"><span class="label">模型</span><span class="value">' + (llm.model || "—") + '</span></div>',
+          '</div>',
+          '<div class="card"><h2>Mem0 记忆</h2>',
+          '<div class="row"><span class="label">启用</span><span class="badge ' + badgeClass(mem.enabled) + '">' + (mem.enabled ? "是" : "否") + '</span></div>',
+          '<div class="row"><span class="label">已初始化</span><span class="badge ' + badgeClass(mem.initialized) + '">' + (mem.initialized ? "是" : "否") + '</span></div>',
+          '</div>',
+          '<div class="card"><h2>RAG</h2>',
+          '<div class="row"><span class="label">启用</span><span class="badge ' + badgeClass(rag.enabled) + '">' + (rag.enabled ? "是" : "否") + '</span></div>',
+          '<div class="row"><span class="label">文档数</span><span class="value">' + (rag.doc_count != null ? rag.doc_count : "—") + '</span></div>',
+          '<div class="row"><span class="label">Top K</span><span class="value">' + (rag.top_k != null ? rag.top_k : "—") + '</span></div>',
+          '</div>',
+          '<div class="card"><h2>统计</h2>',
+          '<div class="row"><span class="label">聊天请求</span><span class="value">' + (stats.chat_total != null ? stats.chat_total : "—") + '</span></div>',
+          '<div class="row"><span class="label">失败数</span><span class="value">' + (stats.chat_errors != null ? stats.chat_errors : "—") + '</span></div>',
+          '<div class="row"><span class="label">最近活动</span><span class="value">' + lastActivity + '</span></div>',
+          '</div>',
+          '</div>',
+          '<div class="card" style="margin-top:1rem"><h2>Skills</h2>',
+          skills.length ? (
+            '<table><thead><tr><th>名称</th><th>描述</th></tr></thead><tbody>' +
+            skills.map(function (k) {
+              return '<tr><td>' + (k.name || "—") + '</td><td>' + (k.description || "—") + '</td></tr>';
+            }).join("") +
+            "</tbody></table>"
+          ) : "<p class=\"muted\">暂无注册技能</p>",
+          "</div>"
+        ].join("");
+      }
+
+      function formatUptime(sec) {
+        if (sec < 60) return Math.round(sec) + " 秒";
+        if (sec < 3600) return Math.floor(sec / 60) + " 分钟";
+        var h = Math.floor(sec / 3600);
+        var m = Math.floor((sec % 3600) / 60);
+        return h + " 小时 " + m + " 分钟";
+      }
+
+      function getAdminHeaders() {
+        var key = null;
+        try { key = sessionStorage.getItem("admin_api_key"); } catch (e) {}
+        var h = {};
+        if (key) h["X-Admin-API-Key"] = key;
+        return h;
+      }
+
+      function showKeyPrompt() {
+        content.innerHTML = '<div class="card"><h2>看板鉴权</h2><p class="muted">服务端已启用 Admin API Key，请输入后继续。</p><input type="password" id="admin-key-input" class="input" placeholder="Admin API Key" style="margin:0.5rem 0;max-width:320px"><br><button type="button" class="refresh" id="admin-key-submit">确认</button></div>';
+        var input = document.getElementById("admin-key-input");
+        var submit = document.getElementById("admin-key-submit");
+        if (submit && input) {
+          submit.onclick = function () {
+            var v = (input.value || "").trim();
+            if (v) try { sessionStorage.setItem("admin_api_key", v); } catch (e) {}
+            fetchStatus();
+          };
+        }
+      }
+
+      function fetchStatus() {
+        refreshBtn.disabled = true;
+        var opts = { headers: getAdminHeaders() };
+        fetch("/api/admin/status", opts)
+          .then(function (r) {
+            if (r.status === 401) {
+              showKeyPrompt();
+              return Promise.reject(new Error("需要 Admin API Key"));
+            }
+            return r.json();
+          })
+          .then(function (data) {
+            render(data);
+            meta.textContent = "最后更新: " + new Date().toLocaleTimeString("zh-CN");
+          })
+          .catch(function (e) {
+            if (e.message !== "需要 Admin API Key") {
+              content.innerHTML = '<p class="error-msg">获取状态失败: ' + (e.message || "网络错误") + "</p>";
+              meta.textContent = "";
+            }
+          })
+          .finally(function () {
+            refreshBtn.disabled = false;
+          });
+      }
+
+      refreshBtn.addEventListener("click", fetchStatus);
+      fetchStatus();
+      setInterval(fetchStatus, 15000);
+    })();
+  </script>
+</body>
+</html>

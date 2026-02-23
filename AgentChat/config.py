@@ -31,8 +31,11 @@ CORS_ORIGINS = [o.strip() for o in CORS_ORIGINS_RAW.split(",") if o.strip()] if 
 # 聊天限流：每 key（user_id 或 IP）每分钟最多消息数，0 表示不限制
 RATE_LIMIT_CHAT_PER_MIN = int(os.environ.get("RATE_LIMIT_CHAT_PER_MIN", "20"))
 
-# 后台看板鉴权：设置后 /admin 与 /api/admin/status 需带请求头 X-Admin-API-Key
+# 后台看板鉴权：设置后 /admin、/monitor、/api/admin/status、/api/monitor/aggregate 需带 X-Admin-API-Key
 ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY", "").strip()
+
+# 统一监控台：用户注册接口的 base URL，配置后监控台会聚合该服务状态（如 http://localhost:8000 或 Docker 内 http://user-reg-app:8000）
+MONITOR_USER_REG_URL = os.environ.get("MONITOR_USER_REG_URL", "").strip()
 
 # 请求体限制
 CHAT_MESSAGE_MAX_LENGTH = int(os.environ.get("CHAT_MESSAGE_MAX_LENGTH", "8192"))

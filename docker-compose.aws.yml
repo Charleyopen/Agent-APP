@@ -87,6 +87,7 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
       RATE_LIMIT_CHAT_PER_MIN: ${RATE_LIMIT_CHAT_PER_MIN:-20}
       ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+      MONITOR_USER_REG_URL: ${MONITOR_USER_REG_URL:-http://user-reg-app:8000}
       HOST: "0.0.0.0"
       PORT: "8765"
       TZ: UTC

@@ -113,7 +113,8 @@ docker compose -f docker-compose.aws.yml up -d --build
 | LLM_TIMEOUT_SECONDS | 单次 LLM 调用超时 | 60 |
 | MEM0_TIMEOUT_SECONDS | Mem0 检索/写入超时 | 10 |
 | CHAT_REQUEST_TIMEOUT_SECONDS | 整次 /api/chat 超时 | 120 |
-| ADMIN_API_KEY | 看板鉴权，设置后需带 X-Admin-API-Key | - |
+| ADMIN_API_KEY | 看板/监控台鉴权，设置后需带 X-Admin-API-Key | - |
+| MONITOR_USER_REG_URL | 用户注册 base URL，配置后监控台聚合该服务状态 | 如 http://localhost:8000 或 http://user-reg-app:8000 |
 | RATE_LIMIT_CHAT_PER_MIN | 每用户/IP 每分钟消息数 | 20 |
 
 ---
@@ -182,6 +183,19 @@ docker compose -f docker-compose.aws.yml up -d --build
 - **User_Registeration**：日志目录由 `DATA_DIR` 决定，默认写入 `mini.log`；同时输出到控制台。
 - **AgentChat**：日志输出到控制台；无单独日志文件时可配合 systemd/容器或 Nginx 记录访问日志。
 - **生产建议**：对 /health、/ready 做定时探测；对 5xx、504 做告警；敏感信息勿写入日志。
+
+### 后端监控台（统一看板）
+
+- **地址**：`http://<AgentChat 主机>:8765/monitor`（与 AgentChat 同端口，例如本地 `http://localhost:8765/monitor`）。
+- **用途**：日常巡检、故障排查、提测时一眼查看 **User_Registeration** 与 **AgentChat** 是否正常；聚合展示两服务的 Health/Ready、AgentChat 运行时长/LLM/记忆/RAG/聊天统计与最近活动。
+- **鉴权**：若配置了 `ADMIN_API_KEY`，打开监控台或调用聚合 API 时需在页面输入 Key，或请求头带 `X-Admin-API-Key`。
+- **聚合接口**：`GET /api/monitor/aggregate`（同样需 Admin Key），返回 JSON，便于脚本或外部监控拉取。
+- **只显示 AgentChat**：不配置 `MONITOR_USER_REG_URL` 时，监控台仅展示 AgentChat 状态。
+- **同时显示用户注册服务**：在 AgentChat 所在环境设置 `MONITOR_USER_REG_URL` 为用户注册接口的 base URL，例如：
+  - 本地：`MONITOR_USER_REG_URL=http://localhost:8000`
+  - Docker 全栈：`MONITOR_USER_REG_URL=http://user-reg-app:8000`
+  - 生产：`MONITOR_USER_REG_URL=https://api.yourdomain.com`（需网络可达）
+- **入口链接**：监控台页内提供「→ AgentChat 后台看板」链接，可跳转到更细的 `/admin` 看板（LLM/ Mem0/ RAG/ Skills 详情）。
 
 ---
 

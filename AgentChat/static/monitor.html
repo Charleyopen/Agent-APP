@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>后端监控台</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a1f26;
+      --border: #2d3748;
+      --text: #e2e8f0;
+      --muted: #718096;
+      --ok: #48bb78;
+      --warn: #ecc94b;
+      --err: #fc8181;
+      --accent: #63b3ed;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .layout { max-width: 1000px; margin: 0 auto; padding: 1.5rem 1rem; }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    h1 { margin: 0; font-size: 1.25rem; font-weight: 600; }
+    .sub { color: var(--muted); font-size: 0.85rem; margin-top: 0.25rem; }
+    .refresh {
+      padding: 0.5rem 1rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .refresh:hover { background: var(--border); }
+    .refresh:disabled { opacity: 0.6; cursor: not-allowed; }
+    .services { display: flex; flex-direction: column; gap: 1.25rem; }
+    .service-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+    }
+    .service-card h2 {
+      margin: 0 0 0.75rem;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    .service-card .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.75rem;
+    }
+    .row { display: flex; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.4rem; }
+    .row:last-child { margin-bottom: 0; }
+    .label { color: var(--muted); }
+    .value { font-weight: 500; }
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+    .badge.ok { background: rgba(72,187,120,0.2); color: var(--ok); }
+    .badge.warn { background: rgba(236,201,75,0.2); color: var(--warn); }
+    .badge.err { background: rgba(252,129,129,0.2); color: var(--err); }
+    .badge.muted { background: rgba(113,128,150,0.2); color: var(--muted); }
+    .loading { color: var(--muted); }
+    .error-msg { color: var(--err); margin-top: 0.5rem; }
+    .meta { color: var(--muted); font-size: 0.8rem; margin-top: 1rem; }
+    .link { color: var(--accent); text-decoration: none; font-size: 0.85rem; }
+    .link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <header>
+      <div>
+        <h1>后端监控台</h1>
+        <p class="sub">User_Registeration · AgentChat 统一状态</p>
+      </div>
+      <button type="button" class="refresh" id="refresh">刷新</button>
+    </header>
+    <div id="content" class="loading">加载中…</div>
+    <p class="meta" id="meta"></p>
+  </div>
+  <script>
+    (function () {
+      const content = document.getElementById("content");
+      const meta = document.getElementById("meta");
+      const refreshBtn = document.getElementById("refresh");
+
+      function badgeClass(v) {
+        if (v === true || v === "ok" || v === "yes") return "ok";
+        if (v === false || v === "error") return "err";
+        return "muted";
+      }
+
+      function render(data) {
+        const ac = data.agentchat || {};
+        const ur = data.user_registration;
+        const parts = [];
+
+        if (ur) {
+          const healthOk = ur.health && ur.health.status === "ok";
+          const readyOk = ur.ready && ur.ready.status === "ok";
+          const err = ur.error;
+          parts.push(
+            '<div class="service-card">',
+            '<h2>' + (ur.service || "User_Registeration") + '</h2>',
+            err
+              ? '<p class="error-msg">' + (err || "请求失败") + '</p>'
+              : [
+                  '<div class="grid">',
+                  '<div class="row"><span class="label">Health</span><span class="badge ' + badgeClass(healthOk) + '">' + (healthOk ? "正常" : "异常") + '</span></div>',
+                  '<div class="row"><span class="label">Ready</span><span class="badge ' + badgeClass(readyOk) + '">' + (readyOk ? "就绪" : "未就绪") + '</span></div>',
+                  '</div>'
+                ].join(""),
+            "</div>"
+          );
+        }
+
+        const admin = ac.admin || {};
+        const stats = admin.stats || {};
+        const lastActivity = stats.last_activity_iso ? new Date(stats.last_activity_iso).toLocaleString("zh-CN") : "暂无";
+        parts.push(
+          '<div class="service-card">',
+          '<h2>AgentChat</h2>',
+          '<div class="grid">',
+          '<div class="row"><span class="label">Health</span><span class="badge ok">正常</span></div>',
+          '<div class="row"><span class="label">运行时长</span><span class="value">' + (admin.uptime_seconds != null ? formatUptime(admin.uptime_seconds) : "—") + '</span></div>',
+          '<div class="row"><span class="label">LLM</span><span class="badge ' + badgeClass(admin.llm_configured) + '">' + (admin.llm_configured ? "已配置" : "未配置") + '</span></div>',
+          '<div class="row"><span class="label">模型</span><span class="value">' + (admin.model || "—") + '</span></div>',
+          '<div class="row"><span class="label">记忆</span><span class="badge ' + badgeClass(admin.memory && admin.memory.initialized) + '">' + (admin.memory && admin.memory.initialized ? "就绪" : "—") + '</span></div>',
+          '<div class="row"><span class="label">RAG</span><span class="badge ' + badgeClass(admin.rag_enabled) + '">' + (admin.rag_enabled ? "开" : "关") + '</span></div>',
+          '<div class="row"><span class="label">聊天请求</span><span class="value">' + (stats.chat_total != null ? stats.chat_total : "—") + '</span></div>',
+          '<div class="row"><span class="label">失败数</span><span class="value">' + (stats.chat_errors != null ? stats.chat_errors : "—") + '</span></div>',
+          '<div class="row"><span class="label">最近活动</span><span class="value">' + lastActivity + '</span></div>',
+          '</div>',
+          '<p style="margin-top:0.75rem"><a class="link" href="/admin">→ AgentChat 后台看板</a></p>',
+          "</div>"
+        );
+
+        content.innerHTML = '<div class="services">' + parts.join("") + "</div>";
+      }
+
+      function formatUptime(sec) {
+        if (sec < 60) return Math.round(sec) + " 秒";
+        if (sec < 3600) return Math.floor(sec / 60) + " 分钟";
+        var h = Math.floor(sec / 3600);
+        var m = Math.floor((sec % 3600) / 60);
+        return h + " 小时 " + m + " 分钟";
+      }
+
+      function getAdminHeaders() {
+        var key = null;
+        try { key = sessionStorage.getItem("admin_api_key"); } catch (e) {}
+        var h = {};
+        if (key) h["X-Admin-API-Key"] = key;
+        return h;
+      }
+
+      function showKeyPrompt() {
+        content.innerHTML = '<div class="service-card"><h2>鉴权</h2><p class="muted">服务端已启用 Admin API Key，请输入后继续。</p><input type="password" id="admin-key-input" placeholder="Admin API Key" style="margin:0.5rem 0;max-width:320px;padding:0.5rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text)"><br><button type="button" class="refresh" id="admin-key-submit">确认</button></div>';
+        var input = document.getElementById("admin-key-input");
+        var submit = document.getElementById("admin-key-submit");
+        if (submit && input) {
+          submit.onclick = function () {
+            var v = (input.value || "").trim();
+            if (v) try { sessionStorage.setItem("admin_api_key", v); } catch (e) {}
+            fetchStatus();
+          };
+        }
+      }
+
+      function fetchStatus() {
+        refreshBtn.disabled = true;
+        fetch("/api/monitor/aggregate", { headers: getAdminHeaders() })
+          .then(function (r) {
+            if (r.status === 401) {
+              showKeyPrompt();
+              return Promise.reject(new Error("需要 Admin API Key"));
+            }
+            return r.json();
+          })
+          .then(function (data) {
+            render(data);
+            meta.textContent = "最后更新: " + new Date().toLocaleTimeString("zh-CN");
+          })
+          .catch(function (e) {
+            if (e.message !== "需要 Admin API Key") {
+              content.innerHTML = '<p class="error-msg">获取状态失败: ' + (e.message || "网络错误") + "</p>";
+              meta.textContent = "";
+            }
+          })
+          .finally(function () {
+            refreshBtn.disabled = false;
+          });
+      }
+
+      refreshBtn.addEventListener("click", fetchStatus);
+      fetchStatus();
+      setInterval(fetchStatus, 30000);
+    })();
+  </script>
+</body>
+</html>

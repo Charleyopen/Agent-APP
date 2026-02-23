@@ -10,7 +10,7 @@
 |------|------|-----------|
 | **User_Registeration** | 用户注册、登录、JWT、用户列表，PostgreSQL + Redis 缓存 | API `:8000` |
 | **Self_Center** | 物联网 APP 个人中心 H5（设置、设备、账号安全等） | 静态资源，由宿主 APP 或 Nginx 提供 |
-| **AgentChat** | 单页 Agent 聊天：大模型 + Mem0 记忆 + RAG + 可扩展 Skills | 聊天 `:8765`，看板 `:8765/admin` |
+| **AgentChat** | 单页 Agent 聊天：大模型 + Mem0 记忆 + RAG + 可扩展 Skills | 聊天 `:8765`，看板 `:8765/admin`，**后端监控台** `:8765/monitor` |
 
 ---
 
@@ -38,6 +38,13 @@ docker compose -f docker-compose.aws.yml up -d --build
 
 - **API**：错误响应统一为 `{ "success": false, "error": { "code", "message", "request_id" } }`；请求带 `X-Request-ID` 时原样回传，便于排查。
 - **安全**：CORS、限流、安全头、Admin 看板鉴权均可配置；生产请务必修改默认 SECRET_KEY / 设置 ADMIN_API_KEY，并阅读 [PRODUCTION_CHECKLIST.md](./PRODUCTION_CHECKLIST.md)。
+
+## 后端监控台
+
+- **地址**：`http://<host>:8765/monitor`（与 AgentChat 同机同端口）。
+- **作用**：统一查看 User_Registeration（Health/Ready）与 AgentChat（运行时长、LLM、记忆、RAG、聊天统计）；适合日常巡检与提测。
+- **鉴权**：若配置了 `ADMIN_API_KEY`，打开页面或调用 `GET /api/monitor/aggregate` 时需带 Key（页面可输入或请求头 `X-Admin-API-Key`）。
+- **聚合用户注册**：在 AgentChat 环境设置 `MONITOR_USER_REG_URL`（如 `http://localhost:8000` 或 Docker 内 `http://user-reg-app:8000`），监控台会拉取并展示用户注册服务状态。详见 [docs/MAINTENANCE.md](./docs/MAINTENANCE.md) 第七节。
 
 ## 文档
 

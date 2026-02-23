@@ -28,6 +28,7 @@ from config import (
     ADMIN_API_KEY,
     CHAT_MESSAGE_MAX_LENGTH,
     CHAT_HISTORY_MAX_ITEMS,
+    MONITOR_USER_REG_URL,
 )
 from middleware import RequestIDMiddleware, SecurityHeadersMiddleware
 import memory as mem_module
@@ -149,6 +150,46 @@ async def ready():
     return {"status": "ok"}
 
 
+@app.get("/api/monitor/aggregate", dependencies=[Depends(require_admin_key)])
+async def monitor_aggregate():
+    """统一监控台：聚合本服务 + 用户注册接口（若已配置 MONITOR_USER_REG_URL）状态。"""
+    import httpx
+    agentchat = {
+        "service": "AgentChat",
+        "health": {"status": "ok"},
+        "admin": None,
+    }
+    s = get_stats()
+    last_at = s.get("last_activity_at")
+    agentchat["admin"] = {
+        "uptime_seconds": round(s["uptime_seconds"], 1),
+        "llm_configured": bool(OPENAI_API_KEY or OPENAI_BASE_URL),
+        "model": LLM_MODEL,
+        "memory": mem_module.get_memory_status(),
+        "rag_enabled": RAG_ENABLED,
+        "stats": {
+            "chat_total": s["chat_total"],
+            "chat_errors": s["chat_errors"],
+            "last_activity_iso": (__import__("datetime").datetime.utcfromtimestamp(last_at).isoformat() + "Z") if last_at else None,
+        },
+    }
+    out = {"agentchat": agentchat, "user_registration": None}
+    if MONITOR_USER_REG_URL:
+        base = MONITOR_USER_REG_URL.rstrip("/")
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                health_r = await client.get(f"{base}/health")
+                ready_r = await client.get(f"{base}/ready")
+            out["user_registration"] = {
+                "service": "User_Registeration",
+                "health": health_r.json() if health_r.status_code == 200 else {"status": "error", "status_code": health_r.status_code},
+                "ready": ready_r.json() if ready_r.status_code == 200 else {"status": "error", "status_code": ready_r.status_code},
+            }
+        except Exception as e:
+            out["user_registration"] = {"service": "User_Registeration", "error": str(e)}
+    return out
+
+
 @app.get("/api/admin/status", dependencies=[Depends(require_admin_key)])
 async def admin_status():
     """后台看板：服务、LLM、Mem0、RAG、Skills、统计。"""
@@ -199,6 +240,14 @@ if STATIC_DIR.is_dir():
         if admin_file.is_file():
             return FileResponse(admin_file)
         return {"message": "Admin dashboard not found", "status_api": "/api/admin/status"}
+
+    @app.get("/monitor")
+    async def monitor_console():
+        """统一后端监控台：聚合 User_Registeration + AgentChat 状态。"""
+        monitor_file = STATIC_DIR / "monitor.html"
+        if monitor_file.is_file():
+            return FileResponse(monitor_file)
+        return {"message": "Monitor not found", "api": "/api/monitor/aggregate"}
 
 
 if __name__ == "__main__":

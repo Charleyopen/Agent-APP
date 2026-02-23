@@ -43,6 +43,7 @@ docker compose -f docker-compose.aws.yml up -d --build
 
 - [DEPLOY_AWS.md](./DEPLOY_AWS.md) — AWS/自建机部署步骤
 - [PRODUCTION_CHECKLIST.md](./PRODUCTION_CHECKLIST.md) — 上线前检查清单
+- [docs/MAINTENANCE.md](./docs/MAINTENANCE.md) — **维护指南与提测指南**（接手人必读）
 - [docs/PRIVACY.md](./docs/PRIVACY.md) — 隐私政策（可对外展示）
 - [docs/TERMS.md](./docs/TERMS.md) — 用户协议（可对外展示）
 

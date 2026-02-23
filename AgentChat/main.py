@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """AgentChat FastAPI 应用：单页聊天 + /chat 接口，商业级中间件与鉴权。"""
+import asyncio
 import logging
 from pathlib import Path
 from typing import List, Optional
@@ -15,6 +16,7 @@ from agent import run_agent
 from config import (
     OPENAI_API_KEY,
     OPENAI_BASE_URL,
+    CHAT_REQUEST_TIMEOUT_SECONDS,
     HOST,
     PORT,
     LLM_MODEL,
@@ -113,13 +115,23 @@ async def chat(request: Request, req: ChatRequest):
         )
     history = (req.history or [])[:CHAT_HISTORY_MAX_ITEMS]
     try:
-        reply = await run_agent(
-            user_message=req.message,
-            user_id=req.user_id,
-            history=history,
+        reply = await asyncio.wait_for(
+            run_agent(
+                user_message=req.message,
+                user_id=req.user_id,
+                history=history,
+            ),
+            timeout=float(CHAT_REQUEST_TIMEOUT_SECONDS),
         )
         record_chat_success()
         return ChatResponse(reply=reply)
+    except asyncio.TimeoutError:
+        record_chat_error()
+        logger.warning("chat 请求超时 (limit=%ss)", CHAT_REQUEST_TIMEOUT_SECONDS)
+        raise HTTPException(
+            status_code=504,
+            detail="请求处理超时，请稍后重试或缩短输入内容",
+        )
     except Exception as e:
         record_chat_error()
         logger.exception("chat 失败: %s", e)

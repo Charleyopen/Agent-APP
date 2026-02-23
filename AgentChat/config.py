@@ -6,6 +6,12 @@ import os
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "").strip() or None  # Ollama: http://localhost:11434/v1
 LLM_MODEL = os.environ.get("LLM_MODEL", "gpt-4o-mini")
+# 单次 LLM 调用超时（秒），防止外部 API 无响应拖垮请求
+LLM_TIMEOUT_SECONDS = int(os.environ.get("LLM_TIMEOUT_SECONDS", "60"))
+# 单次 Mem0 检索/写入超时（秒）
+MEM0_TIMEOUT_SECONDS = int(os.environ.get("MEM0_TIMEOUT_SECONDS", "10"))
+# 整次 /api/chat 请求超时（秒），含多轮 tool 与记忆
+CHAT_REQUEST_TIMEOUT_SECONDS = int(os.environ.get("CHAT_REQUEST_TIMEOUT_SECONDS", "120"))
 
 # Mem0 记忆（可选）
 MEM0_ENABLED = os.environ.get("MEM0_ENABLED", "true").lower() in ("true", "1", "yes")
